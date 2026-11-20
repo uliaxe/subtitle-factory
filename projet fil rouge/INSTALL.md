@@ -42,7 +42,7 @@ cp .env.example .env
 ```
 
 Ouvrir `.env` et **changer** au minimum `POSTGRES_PASSWORD` et `ADMIN_PASSWORD`.
-Adapter `NUM_WORKERS` à la carte : 1 pour 4 Go (meilleur débit mesuré), 10 pour une L4 (24 Go).
+Adapter `NUM_WORKERS` à la carte : 2 pour 4 Go, 10 pour une L4 (24 Go).
 
 Construire et démarrer :
 
@@ -93,11 +93,11 @@ et restent visibles dans les statistiques. Si un worker IA plante, le service le
 | `POSTGRES_PASSWORD` | à définir | Mot de passe interne de la base |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | `admin` / à définir | Compte admin créé au premier démarrage |
 | `APP_PORT` | `8000` | Port de l'interface sur la machine |
-| `NUM_WORKERS` | `1` | Traitements simultanés ; au-delà, refus immédiat (pas de file d'attente) |
+| `NUM_WORKERS` | `2` | Traitements simultanés ; au-delà, refus immédiat (pas de file d'attente) |
 | `WHISPER_MODEL` | `medium.en` | Modèle de transcription |
 | `WHISPER_COMPUTE_TYPE` | `int8_float16` | Compression du modèle (~1 Go de mémoire GPU par worker) |
-| `WHISPER_BEAM_SIZE` | `5` | Largeur de recherche ; avec le mode par lots, garder 5 (1 fait sauter des passages) |
-| `WHISPER_BATCH_SIZE` | `8` | Mode par lots de faster-whisper (0 = désactivé) ; +50 % de débit mesuré |
+| `WHISPER_BEAM_SIZE` | `1` | Largeur de recherche : 1 est le plus rapide, à qualité équivalente mesurée |
+| `WHISPER_BATCH_SIZE` | `0` | Mode par lots de faster-whisper (0 = désactivé) ; plus rapide avec un seul worker, mais moins précis et plus lent à plusieurs workers |
 | `RETENTION_DAYS` | `7` | Durée de conservation des fichiers utilisateur |
 
 Après une modification : `docker compose up -d`.

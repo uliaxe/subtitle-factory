@@ -46,6 +46,13 @@ def _init_worker(model_name: str, device: str, compute_type: str, beam_size: int
     _BATCH_SIZE = batch_size
 
 
+def decode_options(beam_size: int, batch_size: int) -> dict:
+    options = {"language": "en", "beam_size": beam_size}
+    if batch_size > 0:
+        options.update(batch_size=batch_size, without_timestamps=False)
+    return options
+
+
 def _wait_all_workers(barrier) -> int:
     barrier.wait(timeout=600)
     return os.getpid()
@@ -55,8 +62,7 @@ def _transcribe_in_worker(media_path: str) -> list[Segment]:
     from app.media import load_audio
 
     audio = load_audio(Path(media_path))
-    options = {"batch_size": _BATCH_SIZE} if _BATCH_SIZE > 0 else {}
-    segments, _info = _MODEL.transcribe(audio, language="en", beam_size=_BEAM_SIZE, **options)
+    segments, _info = _MODEL.transcribe(audio, **decode_options(_BEAM_SIZE, _BATCH_SIZE))
     return [(s.start, s.end, s.text.strip()) for s in segments]
 
 

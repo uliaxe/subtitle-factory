@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from concurrent.futures.process import BrokenProcessPool
 
-from app.transcriber import WhisperPool
+from app.transcriber import WhisperPool, decode_options
 from tests.conftest import make_settings
 
 
@@ -46,6 +46,11 @@ def _run(pool, coro_factory):
             pool.stop()
 
     return asyncio.run(scenario())
+
+
+def test_batched_mode_keeps_timestamps_for_short_subtitles():
+    assert decode_options(5, 8) == {"language": "en", "beam_size": 5, "batch_size": 8, "without_timestamps": False}
+    assert decode_options(5, 0) == {"language": "en", "beam_size": 5}
 
 
 def test_job_after_a_worker_crash_is_retried_and_succeeds(tmp_path):

@@ -4,9 +4,9 @@
   "users": 1,
   "config": "workers=1 beam=5 batch=16",
   "output": "text",
-  "makespan_s": 23.3,
+  "makespan_s": 32.5,
   "audio_s": 148.9,
-  "throughput_x_realtime": 6.38,
+  "throughput_x_realtime": 4.58,
   "done": 1,
   "failed": 0,
   "results": [
@@ -14,16 +14,16 @@
       "user": 1,
       "media": "input.mp4",
       "media_duration_s": 148.899,
-      "submitted_at": 0.32251490000635386,
-      "accepted_at": 0.4450686000054702,
-      "finished_at": 23.66559530000086,
+      "submitted_at": 0.37726609999663197,
+      "accepted_at": 0.5452951999905054,
+      "finished_at": 32.86536989999877,
       "refusals": 0,
       "status": "done",
-      "processing_time_s": 23.179,
+      "processing_time_s": 31.618,
       "error": null,
-      "wer": 0.381,
-      "real_error_rate": 0.118,
-      "words": 586
+      "wer": 0.3954,
+      "real_error_rate": 0.1408,
+      "words": 579
     }
   ]
 }

@@ -65,7 +65,7 @@ def chart_configs(runs: list[dict], target: float) -> Path:
         if not row["acceptable"]:
             bar.set_hatch("//")
             bar.set_edgecolor(GREY)
-        verdict = "" if row["acceptable"] else "  rejeté : passages manqués"
+        verdict = "" if row["acceptable"] else "  rejeté : moins précis"
         ax.text(bar.get_width() + 0.15, bar.get_y() + bar.get_height() / 2,
                 f"{row['throughput']:.1f} x   erreurs réelles {row['real_errors']:.1%}{verdict}",
                 va="center", color=INK, fontsize=9,

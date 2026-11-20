@@ -2,7 +2,7 @@
 
 Projet fil rouge « data indus 26 » : industrialiser le pipeline de sous-titrage Whisper du data scientist.
 Le produit fonctionne de bout en bout dans Docker : un utilisateur envoie une vidéo, Whisper la transcrit
-sur carte graphique en moins de 0,2 fois sa durée, il récupère sa vidéo sous-titrée. Performances mesurées,
+sur carte graphique en moins de 0,55 fois sa durée, il récupère sa vidéo sous-titrée. Performances mesurées,
 optimisées et extrapolées à 10 utilisateurs ; coût estimé sous le budget. Il reste la soutenance et les bonus.
 
 - Installation : [INSTALL.md](INSTALL.md)
@@ -44,7 +44,7 @@ parmi quatre. Un administrateur suit l'usage grâce à des statistiques.
 | Brique | État |
 | --- | --- |
 | Application web : comptes, upload, 4 sorties, admin, purge | Terminée, 37 tests |
-| Service IA : Whisper sur GPU, mode par lots, NVENC, reprise après panne | Terminé, 24 tests |
+| Service IA : Whisper sur GPU, workers, NVENC, reprise après panne | Terminé, 25 tests |
 | Docker Compose : application, PostgreSQL, service IA ; manuel d'installation | Terminé, testé sur poste avec GPU |
 | Mesures, optimisation (9 réglages), 3 scénarios de charge, extrapolation L4 | Terminé |
 | WER, coût annuel | Terminé |
@@ -112,8 +112,8 @@ au-delà (`MAX_CONCURRENT_JOBS` = `NUM_WORKERS`).
 | Data scientist : changer de modèle, ajouter une fonction | Modèle réglable, transcription isolée dans un module | Fait |
 | Optionnel : consulter sans télécharger | Bouton « Voir » : texte, .srt, lecteur vidéo | Fait |
 | Optionnel : brancher la traduction | Texte disponible par l'API ; traduction en bonus | À faire |
-| Performance : plus rapide que la durée du média | Traitement en 0,16 à 0,27 fois la durée (mesuré) | Fait |
-| Performance : 10 utilisateurs en parallèle | 3 scénarios de charge mesurés ; extrapolation L4 : 0,68 à 0,93 fois la durée | Fait (estimé pour la L4) |
+| Performance : plus rapide que la durée du média | Traitement en 0,27 à 0,54 fois la durée (mesuré) | Fait |
+| Performance : 10 utilisateurs en parallèle | 3 scénarios de charge mesurés ; extrapolation L4 : ≈ 0,79 fois la durée | Fait (estimé pour la L4) |
 | Coût : 10 000 € par an au maximum | 7 140 à 7 490 € HT/an en 24h/24, 2 520 à 2 620 € en heures ouvrées | Fait (estimé) |
 
 ### Règles validées avec le product owner
@@ -337,7 +337,7 @@ subtitle-factory/
         │   ├── pipeline.py       transcription puis sortie
         │   ├── media.py          ffmpeg et NVENC
         │   └── subtitles.py      .srt et texte
-        └── tests/                24 tests
+        └── tests/                25 tests
 ```
 
 | Je veux… | Fichier |
@@ -374,54 +374,57 @@ Sans carte graphique, seul le second suffit, sans la ligne `$env:` : l'IA est al
 | Dossier | Tests | Couverture |
 | --- | --- | --- |
 | `subtitle_app/` | 37 | Comptes et rôles, upload et règles, capacité (y compris envois simultanés), purge, statistiques, client HTTP vers l'IA |
-| `ai_service/` | 24 | Format SRT, ffmpeg réel, 4 sorties, refus 429, erreurs, suppression, reprise après mort d'un worker |
+| `ai_service/` | 25 | Format SRT, ffmpeg réel, 4 sorties, refus 429, erreurs, suppression, reprise après mort d'un worker, options de décodage |
 
 ## 11. Mesures
 
 Toutes les mesures se font sur le poste de développement (NVIDIA GTX 1650, 4 Go), dans Docker, à travers
 l'application, avec `bench/charge.py`. Échantillon `input.mp4` : 148,9 s. Résultats bruts : `bench/resultats/`.
 
-**En résumé** : avec le meilleur réglage, une vidéo est transcrite en **0,16 à 0,19 fois sa durée** ; la carte
-traite **6,4 secondes de média par seconde**. Extrapolé à une L4, cela donne ≈ 11 à 15 × le temps réel,
-au-dessus des 10 × nécessaires pour 10 utilisateurs simultanés.
+**En résumé** : avec le réglage retenu (2 workers, `beam 1`, sans mode par lots), chaque vidéo est transcrite en
+**0,27 à 0,54 fois sa durée** sur la carte locale, et la carte traite **5,5 secondes de média par seconde**,
+sans perte en passant de 1 à 2 workers. Extrapolé à une L4 : ≈ 12,7 × le temps réel, au-dessus des 10 ×
+nécessaires pour 10 utilisateurs simultanés.
 
 ### Optimisation : 9 réglages comparés
 
 ![Débit selon le réglage](bench/resultats/debit_reglages.png)
 
-| Réglage | Débit total | Erreurs réelles | Mots transcrits | Verdict |
-| --- | --- | --- | --- | --- |
-| 2 workers, beam 5 (réglage initial) | 3,5 × | 11,0 % | 578 | Lent |
-| 1 worker, beam 5 | 4,2 × | 11,0 % | 578 | |
-| 2 workers, beam 5, lots de 8 | 4,7 × | 11,8 % | 586 | |
-| 1 worker, beam 1 | 5,4 × | 11,4 % | 569 | |
-| 2 workers, beam 1 | 5,5 × | 11,4 % | 569 | |
-| 1 worker, beam 5, lots de 16 | 6,4 × | 11,8 % | 586 | |
-| **1 worker, beam 5, lots de 8** | **6,4 ×** | **11,8 %** | **586** | **Retenu** |
-| 2 workers, beam 1, lots de 8 | 9,8 × | 30,6 % | 460 | Rejeté : passages manqués |
-| 1 worker, beam 1, lots de 8 | 11,2 × | 30,6 % | 460 | Rejeté : passages manqués |
+| Réglage | Débit total | Erreurs réelles | Verdict |
+| --- | --- | --- | --- |
+| 2 workers, beam 5, lots de 8 | 3,1 × | 14,1 % | Rejeté : moins précis, lent à 2 workers |
+| 2 workers, beam 5 (réglage initial) | 3,5 × | 11,0 % | Lent |
+| 1 worker, beam 5 | 4,2 × | 11,0 % | |
+| 1 worker, beam 5, lots de 16 | 4,6 × | 14,1 % | Rejeté : moins précis |
+| 1 worker, beam 5, lots de 8 | 4,9 × | 14,1 % | Rejeté : moins précis |
+| 1 worker, beam 1 | 5,4 × | 11,4 % | |
+| **2 workers, beam 1** | **5,5 ×** | **11,4 %** | **Retenu** |
+| 2 workers, beam 1, lots de 8 | 5,9 × | 13,9 % | Rejeté : moins précis, s'effondre à 2 workers |
+| 1 worker, beam 1, lots de 8 | 8,1 × | 13,9 % | Rejeté : moins précis, s'effondre à 2 workers |
 
 - **Débit total** : secondes de média traitées par seconde, tous traitements confondus.
 - **Erreurs réelles** : mots faux + mots manqués, rapportés aux 483 mots de la référence. Le WER brut
-  (34 à 38 % pour les réglages acceptables) compte aussi les mots prononcés que la référence TV a omis.
+  (34 à 40 %) compte aussi les mots prononcés que la référence TV a omis.
 - **Constats** :
-  1. Plusieurs workers sur une même carte n'augmentent pas le débit : un seul traitement l'occupe déjà
-     (3,5 × à 2 workers contre 4,2 × à 1).
-  2. Le mode par lots de faster-whisper est le vrai levier : +52 % à qualité égale.
-  3. Combiné à `beam 1`, il saute des passages entiers (460 mots au lieu de 586) : rejeté.
+  1. `beam 1` est plus rapide que `beam 5` à qualité équivalente (11,4 % contre 11,0 %).
+  2. Sans mode par lots, passer de 1 à 2 workers ne coûte rien (5,4 × puis 5,5 ×) : de bon augure pour
+     10 workers sur une L4.
+  3. Le mode par lots de faster-whisper ne produit par défaut que des blocs de 30 s : des sous-titres
+     illisibles (jusqu'à 41 s affichés d'un coup). Corrigé en réactivant les horodatages ; il est alors moins
+     précis (+ 25 % d'erreurs) et son débit s'effondre dès 2 workers. Écarté.
 
-Réglage retenu, appliqué par défaut : `NUM_WORKERS=1`, `WHISPER_BEAM_SIZE=5`, `WHISPER_BATCH_SIZE=8`.
+Réglage retenu, appliqué par défaut : `NUM_WORKERS=2`, `WHISPER_BEAM_SIZE=1`, `WHISPER_BATCH_SIZE=0`.
 
 ### Scénarios de charge (réglage retenu)
 
-Dix utilisateurs envoient leur vidéo au même instant. La carte locale n'a qu'une place : les refusés (429)
+Dix utilisateurs envoient leur vidéo au même instant. La carte locale a deux places : les refusés (429)
 réessaient toutes les 3 s, comme le ferait un utilisateur. Petite vidéo : 30 s ; grande : 297,8 s.
 
-| Scénario | Terminés | Traitement / durée (pire cas) | Attente + traitement / durée (pire cas) | Débit total |
+| Scénario | Terminés | Traitement / durée | Attente + traitement / durée (pire cas) | Débit total |
 | --- | --- | --- | --- | --- |
-| 10 petites vidéos | 10 / 10 | 0,27 | 2,25 | 4,3 × |
-| 1 grande + 9 petites | 10 / 10 | 0,26 | 3,98 | 4,7 × |
-| 10 grandes vidéos | 10 / 10 | 0,19 | 1,80 | 5,5 × |
+| 10 petites vidéos | 10 / 10 | 0,42 à 0,51 | 2,37 | 4,1 × |
+| 1 grande + 9 petites | 10 / 10 | 0,27 à 0,54 | 4,29 | 4,4 × |
+| 10 grandes vidéos | 10 / 10 | 0,36 à 0,49 | 2,18 | 4,6 × |
 
 ![10 grandes vidéos](bench/resultats/scen-10-grandes.png)
 
@@ -429,9 +432,9 @@ réessaient toutes les 3 s, comme le ferait un utilisateur. Petite vidéo : 30 s
 
 ![10 petites vidéos](bench/resultats/scen-10-petites.png)
 
-Chaque traitement prend moins de 0,3 fois la durée de la vidéo. Sur la carte locale, avec une seule place,
-les derniers utilisateurs attendent : c'est la limite du matériel de développement, pas du logiciel. Sur la
-L4, les 10 traitements tournent ensemble et l'attente disparaît.
+Chaque traitement prend moins de 0,55 fois la durée de la vidéo. Sur la carte locale, avec deux places,
+les derniers utilisateurs attendent : c'est la limite du matériel de développement. Sur la L4, les
+10 traitements tournent ensemble et l'attente disparaît.
 
 Ces tests ont aussi révélé un défaut, corrigé : pendant l'envoi d'une grande vidéo, d'autres demandes
 pouvaient passer le contrôle de capacité. La place est désormais réservée avant l'envoi (test automatique
@@ -458,13 +461,14 @@ Sources : [NVIDIA L4](https://www.nvidia.com/en-us/data-center/l4/),
 | Réglage | Débit local mesuré | Débit L4 estimé (× 2,3) | Traitement / durée, 10 simultanés | Tient l'exigence |
 | --- | --- | --- | --- | --- |
 | Réglage initial (2 workers, beam 5) | 3,5 × | 8,1 × | 1,24 | Non |
-| Retenu, 1 worker | 6,4 × | 14,7 × | 0,68 | Oui |
-| Retenu, avec la perte mesurée en passant à plusieurs workers (− 27 %) | 4,7 × | 10,8 × | 0,93 | Oui, juste |
+| Retenu (2 workers, beam 1) | 5,5 × | 12,7 × | 0,79 | Oui, marge ≈ 20 % |
 
 Sur la L4, il faut 10 places pour respecter « pas de file d'attente » : `NUM_WORKERS=10` (≈ 1 Go par
-modèle, 24 Go disponibles). L'estimation reste au-dessus du seuil même en appliquant la perte observée
-avec plusieurs workers. Avant une mise en production, une location de 2 h (≈ 1,50 €) avec
-`bench/charge.py debit --users 10` confirmerait le chiffre.
+modèle, 24 Go disponibles). Le débit retenu ne baisse pas de 1 à 2 workers sur la carte locale ; rien ne
+garantit qu'il en soit de même à 10. Les scénarios de charge, qui incluent les envois et les pauses de
+nouvel essai propres à la carte locale, donnent un débit plus bas (4,1 à 4,6 ×) : extrapolé tel quel, il
+mènerait à ≈ 1,0. Avant une mise en production, une location de 2 h (≈ 1,50 €) avec
+`bench/charge.py debit --users 10` trancherait.
 
 ### Coût annuel (Scaleway, Paris)
 
@@ -489,8 +493,8 @@ noms d'intervenants (réglage retenu) :
 | Mesure | Valeur |
 | --- | --- |
 | Mots de la référence | 483 |
-| WER brut | 38,1 % |
-| Erreurs réelles (mots faux + manqués) | 11,8 % |
+| WER brut | 34,4 % |
+| Erreurs réelles (mots faux + manqués) | 11,4 % |
 
 La référence est un sous-titrage TV qui résume l'oral ; Whisper transcrit mot à mot. La plupart des
 « erreurs » du WER brut sont des mots prononcés absents de la référence.
@@ -541,15 +545,15 @@ python bench/graphiques.py                             # graphiques dans bench/r
 | Rétention | Fichiers 7 jours, historique permanent | Product owner | Vie privée et suivi |
 | Inscription | Libre, rôle utilisateur | Équipe | Simplicité |
 | Architecture | Application sans IA + service IA séparé | Conseiller technique | Isoler le GPU |
-| Parallélisme | Une copie du modèle par worker ; 1 worker en local, 10 sur L4 | Conseiller technique, puis mesures | Plusieurs workers n'augmentent pas le débit d'une carte, mais il faut 10 places sans file |
-| Mode par lots | `WHISPER_BATCH_SIZE=8`, `beam 5` | Mesures | +52 % de débit à qualité égale ; `beam 1` en lots saute des passages |
+| Parallélisme | Une copie du modèle par worker ; 2 en local, 10 sur L4 | Conseiller technique, puis mesures | Sans perte de débit de 1 à 2 workers ; il faut 10 places sans file |
+| Décodage | `beam 1`, sans mode par lots | Mesures | Plus rapide à qualité égale ; le mode par lots est moins précis et s'effondre à plusieurs workers |
 | Encodage vidéo | NVENC dans le service IA | Conseiller technique | Ne pas ralentir Whisper |
 | Orchestration | Docker Compose, pas Kubernetes | Équipe | Un seul serveur |
 | Serveur cible | Scaleway L4-1-24G, 0,75 €/h HT (≈ 6 570 €/an 24h/24, ≈ 2 400 €/an heures de bureau) | Équipe | Sous le budget |
 | Location du serveur | Non : mesures sur poste local, extrapolation | Équipe | Budget du projet |
 | Moteur | faster-whisper, audio par ffmpeg | Équipe | Vitesse, fiabilité |
 | Échanges de fichiers | HTTP entre application et service IA | Équipe | Simplicité |
-| Triton Inference Server | Non retenu | Équipe | Le mode par lots de faster-whisper suffit d'après l'extrapolation |
+| Triton Inference Server | Non retenu pour l'instant | Équipe | L'extrapolation tient sans lui ; piste si la mesure réelle sur L4 déçoit |
 
 ### Feuille de route
 

@@ -4,9 +4,9 @@
   "users": 2,
   "config": "workers=2 beam=1 batch=8",
   "output": "text",
-  "makespan_s": 30.4,
+  "makespan_s": 50.9,
   "audio_s": 297.8,
-  "throughput_x_realtime": 9.78,
+  "throughput_x_realtime": 5.85,
   "done": 2,
   "failed": 0,
   "results": [
@@ -14,31 +14,31 @@
       "user": 1,
       "media": "input.mp4",
       "media_duration_s": 148.899,
-      "submitted_at": 0.32604619998892304,
-      "accepted_at": 0.4774757999985013,
-      "finished_at": 30.768772800001898,
+      "submitted_at": 0.4251786000095308,
+      "accepted_at": 0.6125107999978354,
+      "finished_at": 51.30343120000907,
       "refusals": 0,
       "status": "done",
-      "processing_time_s": 29.565,
+      "processing_time_s": 50.253,
       "error": null,
-      "wer": 0.499,
-      "real_error_rate": 0.3064,
-      "words": 460
+      "wer": 0.3872,
+      "real_error_rate": 0.1387,
+      "words": 574
     },
     {
       "user": 2,
       "media": "input.mp4",
       "media_duration_s": 148.899,
-      "submitted_at": 0.580562099989038,
-      "accepted_at": 0.6921067999937804,
-      "finished_at": 29.973526799993124,
+      "submitted_at": 0.7024968000041554,
+      "accepted_at": 0.88876899999741,
+      "finished_at": 50.595432100002654,
       "refusals": 0,
       "status": "done",
-      "processing_time_s": 28.839,
+      "processing_time_s": 49.148,
       "error": null,
-      "wer": 0.499,
-      "real_error_rate": 0.3064,
-      "words": 460
+      "wer": 0.3872,
+      "real_error_rate": 0.1387,
+      "words": 574
     }
   ]
 }

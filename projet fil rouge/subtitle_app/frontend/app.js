@@ -9,6 +9,12 @@ const OUTPUTS = {
   subtitles: { label: "Sous-titres seuls", desc: "Fichier .srt avec horodatage", video: false },
   text: { label: "Texte seul", desc: "Transcription sans horodatage", video: false },
 };
+const THUMBS = {
+  video_embedded: `<span class="thumb" aria-hidden="true"><span class="bar"></span></span>`,
+  video_metadata: `<span class="thumb" aria-hidden="true"><span class="cc">CC</span></span>`,
+  subtitles: `<span class="thumb doc" aria-hidden="true"><i class="ts"></i><i></i><i class="ts"></i><i class="short"></i></span>`,
+  text: `<span class="thumb doc" aria-hidden="true"><i></i><i></i><i></i><i class="short"></i></span>`,
+};
 const STATUS = { pending: "En attente", processing: "En cours", done: "Terminé", failed: "Échoué" };
 
 const state = { token: null, user: null, jobs: [], pollTimer: null, viewerJob: null, viewerUrl: null };
@@ -23,9 +29,19 @@ function fmtDate(iso) {
 }
 function fmtSeconds(s) {
   if (s == null) return "—";
-  if (s < 60) return `${s.toFixed(1)} s`;
+  if (s < 60) return `${s.toFixed(1).replace(".", ",")} s`;
   const m = Math.floor(s / 60);
   return `${m} min ${String(Math.round(s % 60)).padStart(2, "0")}`;
+}
+function kindLabel(type) {
+  return `<span class="kind">${THUMBS[type]}${OUTPUTS[type].label}</span>`;
+}
+function renderSrt(content) {
+  return content.split("\n").map((line) => {
+    if (/-->/.test(line)) return `<span class="ts">${esc(line)}</span>`;
+    if (/^\s*\d+\s*$/.test(line)) return `<span class="idx">${esc(line)}</span>`;
+    return esc(line);
+  }).join("\n");
 }
 function statusChip(status) {
   return `<span class="status ${status}">${STATUS[status]}</span>`;
@@ -64,6 +80,7 @@ function loadToken() {
 async function startSession() {
   state.user = await (await api("/auth/me")).json();
   $("who-name").textContent = state.user.username;
+  $("who-avatar").textContent = state.user.username.charAt(0);
   $("who-role").textContent = state.user.role === "admin" ? "Administrateur" : "Utilisateur";
   $("admin-tab").hidden = state.user.role !== "admin";
   $("login-view").hidden = true;
@@ -88,6 +105,7 @@ $("switch-mode").addEventListener("click", () => {
   signUpMode = !signUpMode;
   show($("login-error"), "");
   $("login-submit").textContent = signUpMode ? "Créer mon compte" : "Se connecter";
+  $("login-heading").textContent = signUpMode ? "Créer un compte" : "Connexion";
   $("switch-text").textContent = signUpMode ? "Déjà un compte ?" : "Pas encore de compte ?";
   $("switch-mode").textContent = signUpMode ? "Se connecter" : "Créer un compte";
   $("signup-rules").hidden = !signUpMode;
@@ -150,8 +168,9 @@ function renderOutputs() {
   $("outputs").insertAdjacentHTML("beforeend", Object.entries(OUTPUTS).map(([value, o]) => `
     <label class="option">
       <input type="radio" name="output_type" value="${value}" id="out-${value}">
+      ${THUMBS[value]}
       <strong>${o.label}</strong>
-      <span>${o.desc}</span>
+      <span class="desc">${o.desc}</span>
     </label>`).join(""));
 }
 
@@ -240,7 +259,7 @@ function renderJobs() {
   $("jobs-body").innerHTML = state.jobs.map((job) => `
     <tr>
       <td class="file">${esc(job.original_filename)}</td>
-      <td>${OUTPUTS[job.output_type].label}</td>
+      <td>${kindLabel(job.output_type)}</td>
       <td>${statusChip(job.status)}${job.error_message ? `<span class="err-line">${esc(job.error_message)}</span>` : ""}</td>
       <td>${fmtDate(job.created_at)}</td>
       <td class="num">${fmtSeconds(job.media_duration_s)}</td>
@@ -308,7 +327,10 @@ async function openViewer(job) {
       $("viewer-body").innerHTML = `<video controls src="${state.viewerUrl}"></video>`;
     } else {
       const { blob } = await fetchResult(job);
-      $("viewer-body").innerHTML = `<pre>${esc(await blob.text())}</pre>`;
+      const content = await blob.text();
+      $("viewer-body").innerHTML = job.output_type === "subtitles"
+        ? `<pre class="transcript">${renderSrt(content)}</pre>`
+        : `<div class="transcript prose">${esc(content)}</div>`;
     }
     $("viewer").scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (error) {
@@ -326,8 +348,13 @@ function closeViewer() {
 $("viewer-close").addEventListener("click", closeViewer);
 $("viewer-download").addEventListener("click", () => state.viewerJob && downloadResult(state.viewerJob));
 
-function tile(label, value, sub = "", tone = "") {
-  return `<div class="tile ${tone}"><span class="label">${label}</span><span class="value">${value}</span><span class="sub">${sub}</span></div>`;
+function tile(label, value, sub = "", tone = "", extra = "") {
+  return `<div class="tile ${tone}"><span class="label">${label}</span><span class="value">${value}</span>${extra}<span class="sub">${sub}</span></div>`;
+}
+function gauge(ratio) {
+  if (ratio == null) return "";
+  const width = Math.min(ratio, 1) * 100;
+  return `<div class="gauge ${ratio < 1 ? "" : "warn"}" role="img" aria-label="${(ratio * 100).toFixed(0)} % de la durée du média"><span style="width:${width}%"></span></div>`;
 }
 
 async function refreshAdmin() {
@@ -339,16 +366,17 @@ async function refreshAdmin() {
 
   const ratio = stats.avg_realtime_ratio;
   $("tiles").innerHTML = [
-    tile("Inférences réalisées", stats.done, `${stats.total} demandes au total`),
+    tile("Inférences réalisées", stats.done, `${stats.total} demandes au total`, "accent"),
     tile("Temps de calcul moyen", fmtSeconds(stats.avg_processing_s), "par traitement terminé"),
-    tile("Ratio temps réel", ratio == null ? "—" : `×${ratio.toFixed(2)}`, "calcul / durée du média, doit rester < 1", ratio == null ? "" : ratio < 1 ? "good" : "warn"),
+    tile("Ratio temps réel", ratio == null ? "—" : `×${ratio.toFixed(2).replace(".", ",")}`, "calcul / durée du média, doit rester < 1", ratio == null ? "" : ratio < 1 ? "good" : "warn", gauge(ratio)),
     tile("Non terminés", stats.unfinished, "en attente ou en cours"),
     tile("Échoués", stats.failed, "depuis la mise en service", stats.failed ? "warn" : ""),
   ].join("");
 
-  $("types-body").innerHTML = Object.entries(OUTPUTS).map(([type, o]) => {
+  const maxTotal = Math.max(1, ...Object.values(stats.by_type).map((s) => s.total));
+  $("types-body").innerHTML = Object.keys(OUTPUTS).map((type) => {
     const s = stats.by_type[type];
-    return `<tr><td>${o.label}</td><td class="num">${s.total}</td><td class="num">${s.done}</td>
+    return `<tr><td>${kindLabel(type)}</td><td class="num"><span class="share" style="width:${(s.total / maxTotal) * 60}px"></span>${s.total}</td><td class="num">${s.done}</td>
       <td class="num">${s.unfinished}</td><td class="num">${s.failed}</td><td class="num">${fmtSeconds(s.avg_processing_s)}</td></tr>`;
   }).join("");
 
@@ -358,14 +386,14 @@ async function refreshAdmin() {
       <td>${fmtDate(job.created_at)}</td>
       <td>${esc(job.username)}</td>
       <td class="file">${esc(job.original_filename)}</td>
-      <td>${OUTPUTS[job.output_type].label}</td>
+      <td>${kindLabel(job.output_type)}</td>
       <td>${statusChip(job.status)}${job.error_message ? `<span class="err-line">${esc(job.error_message)}</span>` : ""}</td>
       <td class="num">${fmtSeconds(job.processing_time_s)}</td>
       <td>${job.result_text ? `<details><summary>Voir le texte</summary><p>${esc(job.result_text)}</p></details>` : "—"}</td>
     </tr>`).join("");
 
   $("users-list").innerHTML = users.map((u) => `
-    <li><span>${esc(u.username)}</span><span class="chip">${u.role === "admin" ? "Administrateur" : "Utilisateur"}</span></li>`).join("");
+    <li><span class="avatar" aria-hidden="true">${esc(u.username.charAt(0))}</span><span class="name">${esc(u.username)}</span><span class="badge ${u.role === "admin" ? "admin" : ""}">${u.role === "admin" ? "Administrateur" : "Utilisateur"}</span></li>`).join("");
 }
 
 $("admin-refresh").addEventListener("click", refreshAdmin);
@@ -383,6 +411,37 @@ $("user-form").addEventListener("submit", async (event) => {
   }
 });
 
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function setupHeroVideo() {
+  const video = $("hero-video");
+  const caption = $("hero-caption");
+  const trackElement = video.querySelector("track");
+  const track = video.textTracks[0];
+  if (!track) return;
+  track.mode = "hidden";
+  const showCue = (cue) => {
+    caption.textContent = cue ? cue.text : "";
+    caption.hidden = !cue;
+  };
+  track.addEventListener("cuechange", () => showCue(track.activeCues?.[0]));
+  const showFirstCue = () => {
+    if (REDUCED_MOTION && track.cues?.length) showCue(track.cues[0]);
+  };
+  trackElement.addEventListener("load", showFirstCue);
+  if (trackElement.readyState === 2) showFirstCue();
+}
+
+function heroPlayback(visible) {
+  const video = $("hero-video");
+  if (visible && !REDUCED_MOTION) video.play().catch(() => {});
+  else video.pause();
+}
+
+new MutationObserver(() => heroPlayback(!$("login-view").hidden))
+  .observe($("login-view"), { attributes: true, attributeFilter: ["hidden"] });
+
+setupHeroVideo();
 renderOutputs();
 state.token = loadToken();
 if (state.token) {
