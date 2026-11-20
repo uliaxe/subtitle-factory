@@ -1,0 +1,9 @@
+data/
+tests/
+.env
+.venv/
+**/__pycache__/
+.pytest_cache/
+pytest.ini
+Dockerfile
+.dockerignore

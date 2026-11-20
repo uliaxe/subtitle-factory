@@ -1,0 +1,10 @@
+projet fil rouge/input.mp4
+
+__pycache__/
+*.pyc
+.pytest_cache/
+
+.env
+data/
+work/
+.venv/

@@ -1,0 +1,66 @@
+name: subtitle-factory
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: subtitles
+      POSTGRES_USER: subtitles
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?à définir dans .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U subtitles -d subtitles"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ai:
+    build: ./ai_service
+    restart: unless-stopped
+    environment:
+      TRANSCRIBER: whisper
+      WHISPER_MODEL: ${WHISPER_MODEL:-medium.en}
+      WHISPER_DEVICE: cuda
+      WHISPER_COMPUTE_TYPE: ${WHISPER_COMPUTE_TYPE:-int8_float16}
+      WHISPER_BEAM_SIZE: ${WHISPER_BEAM_SIZE:-5}
+      NUM_WORKERS: ${NUM_WORKERS:-2}
+      VIDEO_ENCODER: auto
+      WORK_DIR: /work
+    volumes:
+      - models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu, video]
+
+  app:
+    build: ./subtitle_app
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    environment:
+      DATABASE_URL: postgresql+psycopg://subtitles:${POSTGRES_PASSWORD}@db:5432/subtitles
+      STORAGE_DIR: /data/storage
+      AI_BACKEND: http
+      AI_SERVICE_URL: http://ai:8001
+      MAX_CONCURRENT_JOBS: ${NUM_WORKERS:-2}
+      RETENTION_DAYS: ${RETENTION_DAYS:-7}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?à définir dans .env}
+    volumes:
+      - storage:/data
+    depends_on:
+      db:
+        condition: service_healthy
+      ai:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  storage:
+  models:

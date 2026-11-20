@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sous-titrage</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<main id="login-view" class="login" hidden>
+  <form id="login-form" class="login-card">
+    <div class="brand"><span class="brand-mark">CC</span> Sous-titrage</div>
+    <p class="muted">Transcription et sous-titrage de vos vidéos et enregistrements, hébergés en France.</p>
+    <label for="login-username">Identifiant</label>
+    <input id="login-username" name="username" autocomplete="username" required>
+    <label for="login-password">Mot de passe</label>
+    <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+    <p id="signup-rules" class="muted small" hidden>3 caractères minimum pour l'identifiant (lettres, chiffres, _ . -), 6 pour le mot de passe.</p>
+    <p id="login-error" class="error" hidden></p>
+    <button type="submit" class="btn primary" id="login-submit">Se connecter</button>
+    <p class="switch">
+      <span id="switch-text">Pas encore de compte ?</span>
+      <button type="button" class="link" id="switch-mode">Créer un compte</button>
+    </p>
+  </form>
+</main>
+
+<div id="app-view" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark">CC</span> Sous-titrage</div>
+    <nav class="tabs" id="tabs">
+      <button type="button" class="tab active" data-tab="jobs">Mes traitements</button>
+      <button type="button" class="tab" data-tab="admin" id="admin-tab" hidden>Administration</button>
+    </nav>
+    <div class="who">
+      <span id="who-name"></span>
+      <span id="who-role" class="chip"></span>
+      <button type="button" class="btn ghost" id="logout-btn">Se déconnecter</button>
+    </div>
+  </header>
+
+  <main id="jobs-panel" class="page">
+    <section class="card upload">
+      <h2>Nouveau traitement</h2>
+      <form id="upload-form">
+        <label class="drop" id="drop-zone" for="file-input">
+          <input id="file-input" type="file" accept=".mp4,.wav,video/mp4,audio/wav" hidden>
+          <span class="drop-title" id="drop-title">Déposez une vidéo .mp4 ou un audio .wav</span>
+          <span class="muted" id="drop-sub">ou cliquez pour choisir un fichier</span>
+        </label>
+
+        <fieldset class="outputs" id="outputs">
+          <legend>Résultat souhaité</legend>
+        </fieldset>
+        <p id="audio-hint" class="hint" hidden>Un fichier audio ne peut produire que des sous-titres ou du texte.</p>
+
+        <p id="upload-error" class="error" hidden></p>
+        <button type="submit" class="btn primary" id="upload-btn" disabled>Lancer le traitement</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Mes traitements</h2>
+        <span class="muted small">Fichiers conservés 7 jours</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Fichier</th><th>Résultat</th><th>Statut</th><th>Envoyé</th><th class="num">Durée média</th><th class="num">Calcul</th><th></th></tr>
+          </thead>
+          <tbody id="jobs-body"></tbody>
+        </table>
+      </div>
+      <p id="jobs-empty" class="empty" hidden>Aucun traitement pour l'instant. Envoyez un fichier ci-dessus pour commencer.</p>
+    </section>
+
+    <section class="card" id="viewer" hidden>
+      <div class="card-head">
+        <h2 id="viewer-title">Résultat</h2>
+        <div class="actions">
+          <button type="button" class="btn" id="viewer-download">Télécharger</button>
+          <button type="button" class="btn ghost" id="viewer-close">Fermer</button>
+        </div>
+      </div>
+      <div id="viewer-body"></div>
+    </section>
+  </main>
+
+  <main id="admin-panel" class="page" hidden>
+    <section class="tiles" id="tiles"></section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Par type de résultat</h2>
+        <button type="button" class="btn ghost" id="admin-refresh">Actualiser</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Type</th><th class="num">Total</th><th class="num">Terminés</th><th class="num">Non terminés</th><th class="num">Échoués</th><th class="num">Temps moyen</th></tr>
+          </thead>
+          <tbody id="types-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h2>Historique complet</h2>
+        <span class="muted small">Conservé en permanence, tous utilisateurs</span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Date</th><th>Utilisateur</th><th>Fichier</th><th>Résultat</th><th>Statut</th><th class="num">Calcul</th><th>Contenu</th></tr>
+          </thead>
+          <tbody id="history-body"></tbody>
+        </table>
+      </div>
+      <p id="history-empty" class="empty" hidden>Aucun traitement enregistré.</p>
+    </section>
+
+    <section class="card users">
+      <h2>Utilisateurs</h2>
+      <div class="users-grid">
+        <ul id="users-list" class="users-list"></ul>
+        <form id="user-form" class="user-form">
+          <h3>Créer un compte</h3>
+          <label for="new-username">Identifiant</label>
+          <input id="new-username" required minlength="3" maxlength="50" pattern="[A-Za-z0-9_.\-]+">
+          <label for="new-password">Mot de passe (6 caractères minimum)</label>
+          <input id="new-password" type="password" required minlength="6">
+          <label for="new-role">Rôle</label>
+          <select id="new-role">
+            <option value="user">Utilisateur</option>
+            <option value="admin">Administrateur</option>
+          </select>
+          <p id="user-msg" class="hint" hidden></p>
+          <button type="submit" class="btn primary">Créer le compte</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

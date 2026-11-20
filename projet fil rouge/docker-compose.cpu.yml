@@ -1,0 +1,13 @@
+services:
+  ai:
+    environment:
+      WHISPER_MODEL: small.en
+      WHISPER_DEVICE: cpu
+      WHISPER_COMPUTE_TYPE: int8
+      NUM_WORKERS: 1
+      VIDEO_ENCODER: cpu
+    deploy: !reset {}
+
+  app:
+    environment:
+      MAX_CONCURRENT_JOBS: 1
