@@ -553,7 +553,7 @@ python bench/graphiques.py                             # graphiques dans bench/r
 
 ### Feuille de route
 
-1. **Slides et démo** (15 à 20 min), à rendre la veille avec le code et le manuel.
+1. **Démo et répétition**, slides à rendre la veille avec le code et le manuel.
 2. **Bonus** : traduction des sous-titres en français, puis identification des locuteurs si le temps le permet.
 3. **Optionnel** : location de 2 h d'une L4 (≈ 1,50 €) pour confirmer l'extrapolation.
 
