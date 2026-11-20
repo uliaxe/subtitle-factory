@@ -1,0 +1,44 @@
+{
+  "label": "cfg-w2-beam5",
+  "scenario": "debit",
+  "users": 2,
+  "config": "workers=2 beam=5 batch=0",
+  "output": "text",
+  "makespan_s": 85.0,
+  "audio_s": 297.8,
+  "throughput_x_realtime": 3.5,
+  "done": 2,
+  "failed": 0,
+  "results": [
+    {
+      "user": 1,
+      "media": "input.mp4",
+      "media_duration_s": 148.899,
+      "submitted_at": 0.3681135999941034,
+      "accepted_at": 0.5632112999883248,
+      "finished_at": 85.37363929999992,
+      "refusals": 0,
+      "status": "done",
+      "processing_time_s": 83.839,
+      "error": null,
+      "wer": 0.354,
+      "real_error_rate": 0.1097,
+      "words": 578
+    },
+    {
+      "user": 2,
+      "media": "input.mp4",
+      "media_duration_s": 148.899,
+      "submitted_at": 0.7290569999895524,
+      "accepted_at": 0.8801996999973198,
+      "finished_at": 84.72574359999271,
+      "refusals": 0,
+      "status": "done",
+      "processing_time_s": 83.732,
+      "error": null,
+      "wer": 0.354,
+      "real_error_rate": 0.1097,
+      "words": 578
+    }
+  ]
+}

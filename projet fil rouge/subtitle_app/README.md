@@ -2,8 +2,10 @@
 
 API applicative, base de données et interface web du projet fil rouge.
 Elle ne contient pas d'IA : la transcription est déléguée à un service IA séparé
-sur le serveur GPU (validé avec le conseiller technique). En attendant ce service,
-une IA simulée (`AI_BACKEND=fake`) permet de tout faire tourner sans GPU.
+sur le serveur GPU (validé avec le conseiller technique), appelé en HTTP avec
+`AI_BACKEND=http`. Une IA simulée (`AI_BACKEND=fake`) permet de tout faire tourner sans GPU.
+
+Pour un déploiement complet (application, PostgreSQL, service IA), voir `../INSTALL.md`.
 
 ## Installation
 
@@ -61,14 +63,17 @@ app/
   services/          logique métier : jobs, stats, purge, authentification
   cruds/             modèles de base et requêtes
   schemas/           objets d'entrée/sortie de l'API (Pydantic)
-  ressources/        client du service IA (contrat AIClient + simulation)
+  ressources/        client du service IA (HttpAIClient) et IA simulée (FakeAIClient)
 frontend/            interface web (HTML/CSS/JS, sans dépendance externe)
-tests/               tests pytest (IA simulée instantanée)
+tests/               tests pytest (IA simulée instantanée, faux serveur HTTP)
 ```
 
-## Brancher le vrai service IA
+## Service IA
 
-Il faut implémenter une classe qui respecte le contrat `AIClient.process(...)`
-dans `app/ressources/_ai_client.py` (par exemple `HttpAIClient`, qui appelle le service
-Whisper du serveur GPU), puis la sélectionner dans `get_ai_client()` via `AI_BACKEND`.
-Le reste de l'application ne change pas.
+`HttpAIClient` envoie le média au service IA (`AI_SERVICE_URL`), télécharge le résultat,
+puis demande au service d'effacer ses copies. Une erreur du service (injoignable, saturé,
+échec) marque le traitement « échoué » avec un message clair.
+`MAX_CONCURRENT_JOBS` doit être égal au `NUM_WORKERS` du service IA.
+
+Pour brancher une autre IA : une classe qui respecte le contrat `AIClient.process(...)`
+dans `app/ressources/_ai_client.py`, sélectionnée dans `get_ai_client()` via `AI_BACKEND`.

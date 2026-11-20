@@ -1,0 +1,29 @@
+{
+  "label": "cfg-w1-beam1-batch8",
+  "scenario": "debit",
+  "users": 1,
+  "config": "workers=1 beam=1 batch=8",
+  "output": "text",
+  "makespan_s": 13.3,
+  "audio_s": 148.9,
+  "throughput_x_realtime": 11.2,
+  "done": 1,
+  "failed": 0,
+  "results": [
+    {
+      "user": 1,
+      "media": "input.mp4",
+      "media_duration_s": 148.899,
+      "submitted_at": 0.3034081000078004,
+      "accepted_at": 0.4628761000058148,
+      "finished_at": 13.595073200005572,
+      "refusals": 0,
+      "status": "done",
+      "processing_time_s": 12.272,
+      "error": null,
+      "wer": 0.499,
+      "real_error_rate": 0.3064,
+      "words": 460
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "label": "echauffement",
+  "scenario": "petites",
+  "users": 1,
+  "config": "",
+  "output": "text",
+  "makespan_s": 5.1,
+  "audio_s": 30.0,
+  "throughput_x_realtime": 5.88,
+  "done": 1,
+  "failed": 0,
+  "results": [
+    {
+      "user": 1,
+      "media": "petite.mp4",
+      "media_duration_s": 30.013317,
+      "submitted_at": 0.27401239999744575,
+      "accepted_at": 0.3270206000015605,
+      "finished_at": 5.378416299994569,
+      "refusals": 0,
+      "status": "done",
+      "processing_time_s": 4.623,
+      "error": null,
+      "wer": null,
+      "real_error_rate": null,
+      "words": null
+    }
+  ]
+}

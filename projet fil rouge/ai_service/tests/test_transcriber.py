@@ -14,11 +14,13 @@ def _no_model(*_args) -> None:
 
 
 def _crash_if_marked(media_path: str):
-    marker = Path(media_path + ".crash")
-    if marker.exists():
-        marker.unlink()
-        os._exit(1)
-    return [(0.0, 1.0, "ok")]
+    if not Path(media_path + ".crash").exists():
+        return [(0.0, 1.0, "ok")]
+    try:
+        os.close(os.open(media_path + ".crashed", os.O_CREAT | os.O_EXCL))
+    except FileExistsError:
+        return [(0.0, 1.0, "ok")]
+    os._exit(1)
 
 
 def _always_crash(_media_path: str):

@@ -1,5 +1,6 @@
 import logging
 import shutil
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -15,6 +16,7 @@ from app.schemas import ALLOWED_OUTPUTS, EXTENSION_TO_KIND, InputKind, JobStatus
 
 LOGGER = logging.getLogger(__name__)
 _CHUNK_SIZE = 1024 * 1024
+_ADMISSION_LOCK = threading.Lock()
 
 
 def detect_input_kind(filename: str) -> InputKind:
@@ -56,25 +58,31 @@ def create_job(
 ) -> cruds.Job:
     kind = detect_input_kind(filename)
     check_output_allowed(kind, output_type)
-    if cruds.count_unfinished(db) >= SETTINGS.max_concurrent_jobs:
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS,
-            f"Capacité atteinte ({SETTINGS.max_concurrent_jobs} traitements en cours). Réessayez dans quelques minutes.",
-        )
-
     job_id = uuid.uuid4().hex
     input_path = SETTINGS.storage_dir / job_id / f"input{Path(filename).suffix.lower()}"
-    _save_upload(source, input_path)
-    job = cruds.Job(
-        id=job_id,
-        user_id=user.id,
-        original_filename=Path(filename).name,
-        input_kind=kind.value,
-        output_type=output_type.value,
-        status=JobStatus.PENDING.value,
-        input_path=str(input_path),
-    )
-    return cruds.add_job(db, job)
+    with _ADMISSION_LOCK:
+        if cruds.count_unfinished(db) >= SETTINGS.max_concurrent_jobs:
+            raise HTTPException(
+                status.HTTP_429_TOO_MANY_REQUESTS,
+                f"Capacité atteinte ({SETTINGS.max_concurrent_jobs} traitements en cours). Réessayez dans quelques minutes.",
+            )
+        job = cruds.add_job(db, cruds.Job(
+            id=job_id,
+            user_id=user.id,
+            original_filename=Path(filename).name,
+            input_kind=kind.value,
+            output_type=output_type.value,
+            status=JobStatus.PENDING.value,
+            input_path=str(input_path),
+        ))
+    try:
+        _save_upload(source, input_path)
+    except BaseException:
+        db.delete(job)
+        db.commit()
+        shutil.rmtree(input_path.parent, ignore_errors=True)
+        raise
+    return job
 
 
 def run_job(job_id: str) -> None:

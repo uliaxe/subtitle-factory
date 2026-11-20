@@ -22,6 +22,7 @@ class Transcriber(Protocol):
 
 _MODEL = None
 _BEAM_SIZE = 5
+_BATCH_SIZE = 0
 
 
 def _add_nvidia_dll_dirs() -> None:
@@ -33,13 +34,16 @@ def _add_nvidia_dll_dirs() -> None:
             os.environ["PATH"] = f"{bin_dir}{os.pathsep}{os.environ['PATH']}"
 
 
-def _init_worker(model_name: str, device: str, compute_type: str, beam_size: int) -> None:
-    global _MODEL, _BEAM_SIZE
+def _init_worker(model_name: str, device: str, compute_type: str, beam_size: int, batch_size: int = 0) -> None:
+    global _MODEL, _BEAM_SIZE, _BATCH_SIZE
     _add_nvidia_dll_dirs()
-    from faster_whisper import WhisperModel
+    from faster_whisper import BatchedInferencePipeline, WhisperModel
 
     _MODEL = WhisperModel(model_name, device=device, compute_type=compute_type)
+    if batch_size > 0:
+        _MODEL = BatchedInferencePipeline(model=_MODEL)
     _BEAM_SIZE = beam_size
+    _BATCH_SIZE = batch_size
 
 
 def _wait_all_workers(barrier) -> int:
@@ -51,7 +55,8 @@ def _transcribe_in_worker(media_path: str) -> list[Segment]:
     from app.media import load_audio
 
     audio = load_audio(Path(media_path))
-    segments, _info = _MODEL.transcribe(audio, language="en", beam_size=_BEAM_SIZE)
+    options = {"batch_size": _BATCH_SIZE} if _BATCH_SIZE > 0 else {}
+    segments, _info = _MODEL.transcribe(audio, language="en", beam_size=_BEAM_SIZE, **options)
     return [(s.start, s.end, s.text.strip()) for s in segments]
 
 
@@ -69,7 +74,7 @@ class WhisperPool:
             max_workers=s.num_workers,
             mp_context=multiprocessing.get_context("spawn"),
             initializer=self._initializer,
-            initargs=(s.model_name, s.device, s.compute_type, s.beam_size),
+            initargs=(s.model_name, s.device, s.compute_type, s.beam_size, s.batch_size),
         )
 
     async def start(self) -> None:

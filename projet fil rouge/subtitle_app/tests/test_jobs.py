@@ -1,8 +1,13 @@
-import pytest
+import threading
+import time
 
-from app import cruds
+import pytest
+from fastapi import HTTPException
+
+from app import cruds, services
 from app.core import SETTINGS, SessionLocal
 from app.ressources import build_srt, format_srt_time
+from app.schemas import OutputType
 
 from conftest import upload
 
@@ -65,6 +70,58 @@ def test_no_queue_new_job_refused_when_capacity_is_reached(client, alice, monkey
     response = upload(client, alice)
     assert response.status_code == 429
     assert "Capacité atteinte" in response.json()["detail"]
+
+
+class _SlowUpload:
+    def __init__(self, chunks: int = 3, delay_s: float = 0.2, fail: bool = False):
+        self._chunks, self._delay_s, self._fail = chunks, delay_s, fail
+
+    def read(self, _size: int) -> bytes:
+        time.sleep(self._delay_s)
+        if self._chunks == 0:
+            return b""
+        if self._fail:
+            raise ConnectionError("envoi interrompu")
+        self._chunks -= 1
+        return b"x" * 10
+
+
+def _last_slot_only(monkeypatch):
+    real_count = cruds.count_unfinished
+    monkeypatch.setattr(cruds, "count_unfinished",
+                        lambda db: real_count(db) + SETTINGS.max_concurrent_jobs - 1)
+
+
+def test_simultaneous_slow_uploads_cannot_exceed_capacity(client, monkeypatch):
+    _last_slot_only(monkeypatch)
+    outcomes = []
+
+    def submit():
+        with SessionLocal() as db:
+            user = cruds.get_user_by_username(db, "alice")
+            try:
+                services.create_job(db, user, "film.mp4", _SlowUpload(), OutputType.TEXT)
+                outcomes.append("accepté")
+            except HTTPException as error:
+                outcomes.append(error.status_code)
+
+    threads = [threading.Thread(target=submit) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert sorted(outcomes, key=str) == [429, 429, "accepté"]
+
+
+def test_interrupted_upload_frees_its_slot(client, alice, monkeypatch):
+    _last_slot_only(monkeypatch)
+    with SessionLocal() as db:
+        user = cruds.get_user_by_username(db, "alice")
+        with pytest.raises(ConnectionError):
+            services.create_job(db, user, "film.mp4", _SlowUpload(fail=True), OutputType.TEXT)
+        assert cruds.count_unfinished(db) == SETTINGS.max_concurrent_jobs - 1
+    assert upload(client, alice).status_code == 202
 
 
 def test_failure_of_the_ai_service_is_recorded(client, alice, monkeypatch):

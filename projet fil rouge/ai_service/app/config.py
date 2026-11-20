@@ -19,6 +19,7 @@ class Settings:
     video_encoder: str
     work_dir: Path
     result_ttl_hours: int
+    batch_size: int = 0
 
 
 def load_settings() -> Settings:
@@ -33,6 +34,7 @@ def load_settings() -> Settings:
         video_encoder=env("VIDEO_ENCODER", default="auto"),
         work_dir=Path(env("WORK_DIR", default="./work")),
         result_ttl_hours=env("RESULT_TTL_HOURS", cast=int, default=24),
+        batch_size=env("WHISPER_BATCH_SIZE", cast=int, default=0),
     )
     if settings.transcriber not in TRANSCRIBERS:
         raise ValueError(f"TRANSCRIBER doit valoir {TRANSCRIBERS}, pas {settings.transcriber!r}")
@@ -40,4 +42,6 @@ def load_settings() -> Settings:
         raise ValueError(f"VIDEO_ENCODER doit valoir {VIDEO_ENCODERS}, pas {settings.video_encoder!r}")
     if settings.num_workers < 1 or settings.beam_size < 1:
         raise ValueError("NUM_WORKERS et WHISPER_BEAM_SIZE doivent être >= 1")
+    if settings.batch_size < 0:
+        raise ValueError("WHISPER_BATCH_SIZE doit être >= 0")
     return settings
